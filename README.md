@@ -67,7 +67,24 @@
       - [GROUP BY分组查询](#group-by分组查询)
       - [ORDER BY排序](#order-by排序)
       - [LIMIT限制查询结果条数](#limit限制查询结果条数)
+    - [常函数](#常函数)
   - [多表查询](#多表查询)
+    - [多表关系](#多表关系)
+    - [交叉连接(CROSS JOIN)](#交叉连接cross-join)
+    - [内连接(INNER JOIN)](#内连接inner-join)
+    - [外连接](#外连接)
+      - [左连接](#左连接)
+      - [右连接](#右连接)
+      - [外连接查询的其它使用场景](#外连接查询的其它使用场景)
+        - [实现查询A-B](#实现查询a-b)
+        - [实现查询B-A](#实现查询b-a)
+    - [自连接](#自连接)
+    - [联合查询(UNION)](#联合查询union)
+    - [子查询](#子查询)
+      - [标量子查询](#标量子查询)
+      - [行列子查询](#行列子查询)
+      - [表子查询](#表子查询)
+  - [MySQL视图、索引](#mysql视图索引)
 
 <!-- /TOC -->
 
@@ -742,6 +759,12 @@ ORDER BY 子句
 - WHERE 子句：可选项。表示为删除操作限定删除条件，若省略该子句，则代表删除该表中的所有行。
 - LIMIT 子句：可选项。用于告知服务器在控制命令被返回到客户端前被删除行的最大值。
 
+删除一张表的全部数据可以用`TRUNCATE` 关键字，语法格式如下：
+
+```sql
+TRUNCATE [TABLE] 表名
+```
+
 ### 查询数据(SELECT)
 
 语句格式如下：
@@ -900,7 +923,7 @@ sum| 求和
 
 - 分组之后，**查询的字段一般为聚合函数和分组字段**，查询其他字段无任何意义。
 - 分组后的表字段与原查询表字段不同，变成了查询语句显示字段。
-- 聚合函数用于分组统计，例如：  
+- 聚合函数用于分组统计(多值变单值)，例如：  
 
 ```sql
   -- 根据性别分组，统计男性和女性数量（只显示分组数量，不显示哪个是男哪个是女）
@@ -947,8 +970,321 @@ LIMIT 关键字不指定初始位置时，记录从第一条记录开始显示�
 LIMIT 记录条数
 ```
 
+### 常函数
+
+几类函数的使用范围：
+
+- **数学函数**  
+  主要用于处理数字，这类函数包括绝对值函数、正弦函数、余弦函数和获得随机数的函数等。
+- **字符串函数**  
+  主要用于处理字符串，其中包括字符串连接函数、字符串比较函数、将字符串的字母都变成小写或大写字母的函数和获取子串的函数等。
+- **日期和时间函数**  
+  主要用于处理日期和时间。其中包括获取当前时间的函数、获取当前日期的函数、返回年份的函数和返回日期的函数等。
+- **条件判断函数**  
+  主要用于在 SQL 语句中控制条件选择。其中包括 IF 语句、CASE 语句和 WHERE 语句等。
+- **系统信息函数**  
+  主要用于获取 MySQL 数据库的系统信息。其中包括获取数据库名的函数、获取当前用户的函数和获取数据库版本的函数等。
+- **加密函数**  
+  主要用于对字符串进行加密解密。其中包括字符串加密函数和字符串解密函数等。
+
+其他函数主要包括格式化函数和锁函数等。
+参考链接[MySQL函数大全](http://c.biancheng.net/mysql/function/ )
+
 ## 多表查询
 
+前面所讲的查询语句都是针对一个表的，但是在关系型数据库中，表与表之间是有联系的，所以在实际应用中，经常使用多表查询。多表查询就是同时查询两个或两个以上的表。
 
+多表连接查询的分类：
+
+- 交叉连接查询:`CROSS JOIN`
+- 内连接查询: `[INNER] JOIN`
+- 外连接:`LEFT [OUTER] JOIN, RIGHT [OUTER] JOIN`
+- 自连接查询
+- 联合查询：`UNION`
+
+### 多表关系
+
+- 一对多
+>
+> 案例：部门与员工  
+> 关系：一个部门对应多个员工，一个员工对应一个部门
+>实现：在多的一方建立外键，指向一的一方的主键
+
+- 多对多
+
+> 案例：学生与课程  
+> 关系：一个学生可以选多门课程，一门课程也可以供多个学生选修  
+> 实现：建立第三张中间表，中间表至少包含两个外键，分别关联两方主键
+
+- 一对一
+
+> 案例：用户与用户详情  
+> 关系：一对一关系，多用于单表拆分，将一张表的基础字段放在一张表中，其他详情字段放在另一张表中，以提升操作效率  
+> 实现：在任意一方加入外键，关联另外一方的主键，并且设置外键为唯一的（UNIQUE）
+
+### 交叉连接(CROSS JOIN)
+
+交叉连接（CROSS JOIN）一般用来返回连接表的笛卡尔积。
+
+语句格式如下：
+
+```sql
+SELECT 查询字段列表 FROM 表1 CROSS JOIN 表2
+[条件语句];/*条件语句是在连接查询之后对记录进行过滤*/
+或
+SELECT 查询字段列表 FROM 表1,表2
+[条件语句]
+```
+
+说明：  
+如果在交叉连接时使用 WHERE 子句，MySQL 会先生成两个表的笛卡尔积，然后再选择满足 WHERE 条件的记录。因此，表的数量较多时，交叉连接会非常非常慢。一般情况下不建议使用交叉连接。
+
+> **笛卡尔积**  
+> 笛卡尔积（Cartesian product）是指两个集合 X 和 Y 的乘积。  
+> 例如，有 A 和 B 两个集合，它们的值如下：  
+> A = {1,2}
+> B = {3,4,5}  
+> 集合 A×B 和 B×A 的结果集分别表示为：  
+> A×B={(1,3), (1,4), (1,5), (2,3), (2,4), (2,5) };  
+> B×A={(3,1), (3,2), (4,1), (4,2), (5,1), (5,2) };  
+> 以上 A×B 和 B×A 的结果就叫做两个集合的笛卡尔积。  
+>并且，从以上结果我们可以看出：
+两个集合相乘，不满足交换率，即 A×B≠B×A。
+A 集合和 B 集合的笛卡尔积是 A 集合的元素个数 × B 集合的元素个数。
+
+### 内连接(INNER JOIN)
+
+连接（INNER JOIN）主要通过设置连接条件的方式，来滤除查询结果中某些数据行的交叉连接。
+
+内连接使用 INNER JOIN 关键字连接两张表，并使用 ON 子句来设置连接条件，一般连接条件是用来**取满足某一条件的两张表记录的交集部分**。
+
+![图片alt](%E5%86%85%E8%BF%9E%E6%8E%A5.png "图片title")
+
+如果没有连接条件，INNER JOIN 和 CROSS JOIN 在语法上是等同的，两者可以互换。
+
+应用场景：
+
+内连接的语法格式如下：
+
+```sql
+/*需要指明查询的字段来源于哪一张表, 格式为:表名.字段名*/
+SELECT 查询字段 FROM 表1 INNER JOIN 表2 
+ON 条件语句;
+
+/*
+例子
+*/
+select e.name, d.name from employee as e inner join dept as d 
+on e.dept = d.id;
+```
+
+### 外连接
+
+内连接的查询结果都是符合连接条件的记录，而外连接会先将连接的表分为基表和参考表，再以基表为依据返回满足和不满足条件的记录。
+
+#### 左连接
+
+语句格式如下
+
+```sql
+SELECT 查询字段 FROM 表1 LEFT [OUTER] JOIN 表2
+ON 连接条件;
+```
+
+说明：
+
+- 上述语法中，“表1”为基表，“表2”为参考表。
+- 左连接查询时，可以**查询出“表1”中的所有记录**和“表2”中**匹配连接条件的记录**。
+- 如果“表1”的某行在“表2”中没有匹配行，那么在返回结果中，“表2”的字段值均为空值（NULL）。
+
+![图片alt](左连接.png "图片title")
+
+#### 右连接
+
+语句格式如下：
+
+```sql
+SELECT 查询字段 FROM 表1 RIGHT [OUTER] JOIN 表2
+ON 连接条件;
+```
+
+- 上述语法中，“表1”为参考表，“表2”为基表。
+- 左连接查询时，可以**查询出“表2”中的所有记录**和**表1中匹配连接条件的记录**。
+- 如果“表1”的某行在“表2”中没有匹配行，那么在返回结果中，“表1”的字段值均为空值（NULL）。
+
+![图片alt](右连接.png "图片title")
+
+#### 外连接查询的其它使用场景
+
+##### 实现查询A-B
+
+语句格式如下：
+
+```sql
+SELECT 查询字段 表A LEFT JOIN 表B 
+ON 连接条件
+WHERE 表B.字段 IS NULL;
+```
+
+![图片alt](B的补集.png "图片title")
+
+##### 实现查询B-A
+
+语句格式如下：
+
+```sql
+SELECT 查询字段 FROM 表A RIGHT JOIN 表B 
+ON 连接条件
+WHERE A.字段 IS NULL;
+```
+
+![图片alt](A的补集.png "图片title")
+
+### 自连接
+
+当前表与自身的连接查询，**自连接必须使用表别名**
+
+语句格式如下：
+
+```sql
+SELECT 字段列表 FROM 表A 别名A JOIN 表A 别名B 
+ON 条件 ...;
+
+/*自连接查询，可以是内连接查询，也可以是外连接查询*/
+
+/*例子：*/
+/* 查询员工及其所属领导的名字*/
+select a.name, b.name from employee a, employee b where a.manager = b.id;
+-- 没有领导的也查询出来
+select a.name, b.name from employee a left join employee b on a.manager = b.id;
+```
+
+### 联合查询(UNION)
+
+联合查询结果是将多个select语句的查询结果联合到一起。可以使用union和union all关键字进行合并。
+
+基本语法：
+
+```sql
+select 语句1
+union [ALL或者DISTINCT]
+select 语句2
+union [ALL或者DISTINCT]
+select 语句n
+```
+
+说明：
+
+- 其中union选项有两个选项可选：all（表示重复也输出）；distinct（去重，完全重复的，默认会去重）
+- 多条查询语句的查询字段需要相同。
+
+例：
+
+```sql
+select id,addrid from addr 
+union all 
+select id,addrid from student
+```
+
+### 子查询
+
+子查询指将一个查询语句嵌套在另一个查询语句中。  
+
+子查询可以在 SELECT、UPDATE 和 DELETE 语句中使用，而且可以进行多层嵌套。  
+
+根据子查询位置可以在WHERE、FROM、SELECT之后。在实际开发时，子查询经常出现在 WHERE 子句中。
+
+语句格式如下:
+
+```sql
+WHERE 表达式 操作符 (子查询语句)
+```
+
+其中，操作符可以是比较运算符和 IN、NOT IN、EXISTS、NOT EXISTS 等关键字。
+
+- IN | NOT IN  
+  当表达式与子查询返回的结果集中的某个值相等时，返回 TRUE，否则返回 FALSE；若使用关键字 NOT，则返回值正好相反。
+- EXISTS | NOT EXISTS  
+  用于判断子查询的结果集是否为空，若子查询的结果集不为空，返回 TRUE，否则返回 FALSE；若使用关键字 NOT，则返回的值正好相反。
+
+例子
+
+```sql
+/*
+使用子查询在 tb_students_info 表和 tb_course 表中查询学习 Java 课程的学生姓名
+*/
+SELECT NAME FROM tb_students_info 
+WHERE course_id IN (SELECT id FROM tb_course WHERE course_name = 'Java');
+/*
+1）首先单独执行内查询，查询出 tb_course 表中课程为 Java 的 id
+2）然后执行外层查询，在 tb_students_info 表中查询 course_id 等于 1 的学生姓名。
+*/
+```
+
+习惯上，外层的 SELECT 查询称为父查询，圆括号中嵌入的查询称为子查询（子查询必须放在圆括号内）。MySQL 在处理上例的 SELECT 语句时，执行流程为：**先执行子查询，再执行父查询**。
+
+根据子查询结果可以分为：
+
+- 单值查询（子查询结果为单个值）
+- 行列子查询(子查询结果为一行或一列数据)
+- 表子查询（子查询结果为多行多列）
+
+#### 标量子查询
+
+子查询返回的结果是**单个值**（数字、字符串、日期等）。
+
+常用操作符：- < > > >= < <=
+
+例子：
+
+```sql
+-- 查询销售部所有员工
+select id from dept where name = '销售部';
+-- 根据销售部部门ID，查询员工信息
+select * from employee where dept = 4;
+-- 合并（子查询）
+select * from employee where dept = (select id from dept where name = '销售部');
+-- 查询xxx入职之后的员工信息
+select * from employee where entrydate > (select entrydate from employee where name = 'xxx');
+```
+
+#### 行列子查询
+
+返回的结果是一列（可以是多行）。
+
+常用操作符：IN,NOT IN,ANY,SOME,ALL
+
+> ANY,SOME表示任意；  
+> ALL表示全部;  
+> 三者通常配合比较运算符使用
+
+例子：
+
+```sql
+-- 查询销售部和市场部的所有员工信息
+select * from employee where dept in (select id from dept where name = '销售部' or name = '市场部');
+-- 查询比财务部所有人工资都高的员工信息
+select * from employee where salary > all(select salary from employee where dept = (select id from dept where name = '财务部'));
+-- 查询比研发部任意一人工资高的员工信息
+select * from employee where salary > any (select salary from employee where dept = (select id from dept where name = '研发部'));
+```
+
+#### 表子查询
+
+返回的结果是多行多列
+常用操作符：IN
+
+例子：
+
+```sql
+-- 查询与xxx1，xxx2的职位和薪资相同的员工
+select * from employee where (job, salary) in (select job, salary from employee where name = 'xxx1' or name = 'xxx2');
+-- 查询入职日期是2006-01-01之后的员工，及其部门信息
+select e.*, d.* from (select * from employee where entrydate > '2006-01-01') as e left join dept as d on e.dept = d.id;
+```
+
+**子查询结果返回多行多列数据记录，可以当作一张临时表，需要指定别名**。
+
+## MySQL视图、索引
 
 
