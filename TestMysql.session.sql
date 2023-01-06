@@ -1,0 +1,1 @@
+DROP user 'user1'@'localhost';
